@@ -3,7 +3,7 @@ A musical instrument tuner for Android.
 
 [<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
       alt="Get it on F-Droid"
-      height="80">](https://f-droid.org/packages/com.github.cythara/)
+      height="80">](https://f-droid.org/packages/com.github.cythara2/)
 
 ## Functionality
 
@@ -31,6 +31,7 @@ Cythara is licensed under GPLv3. A copy of the license is included in the [LICEN
 # Contributors
 
 In chronological order:
+* [gstraube](https://github.com/gstraube) original project author and maintainer
 * [mtbu](https://github.com/mtbu) added the violin tuning
 * [afmachado](https://github.com/afmachado) provided the translation to Brazilian Portuguese
 * [tebriz159](https://github.com/tebriz159) created the logo

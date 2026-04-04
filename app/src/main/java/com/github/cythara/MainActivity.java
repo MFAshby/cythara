@@ -4,12 +4,14 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.ViewGroup;
 import android.view.WindowManager.LayoutParams;
 
 import com.github.cythara.ListenerFragment.TaskCallbacks;
@@ -29,6 +31,8 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.FragmentManager;
 
 public class MainActivity extends AppCompatActivity implements TaskCallbacks,
@@ -94,6 +98,27 @@ public class MainActivity extends AppCompatActivity implements TaskCallbacks,
         myToolbar.setTitle(R.string.app_name);
         myToolbar.showOverflowMenu();
         setSupportActionBar(myToolbar);
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_layout), (v, windowInsets) -> {
+                Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).toPlatformInsets();
+                // Apply the insets as a margin to the view. This solution sets only the
+                // bottom, left, and right dimensions, but you can apply whichever insets are
+                // appropriate to your layout. You can also update the view padding if that's
+                // more appropriate.
+                ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+                mlp.leftMargin = insets.left;
+                mlp.bottomMargin = insets.bottom;
+                mlp.rightMargin = insets.right;
+                mlp.topMargin = insets.top;
+                v.setLayoutParams(mlp);
+
+                // Return CONSUMED if you don't want the window insets to keep passing
+                // down to descendant views.
+                return WindowInsetsCompat.CONSUMED;
+            });
+        }
     }
 
     @Override
@@ -104,83 +129,70 @@ public class MainActivity extends AppCompatActivity implements TaskCallbacks,
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.show_privacy_policy: {
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW,
-                        Uri.parse(getString(R.string.privacy_policy_link)));
-                startActivity(browserIntent);
+        int itemId = item.getItemId();
+        if (itemId == R.id.show_privacy_policy) {
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW,
+                    Uri.parse(getString(R.string.privacy_policy_link)));
+            startActivity(browserIntent);
+        } else if (itemId == R.id.set_notation) {
+            final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
+                    MODE_PRIVATE);
+            final boolean useScientificNotation =
+                    preferences.getBoolean(USE_SCIENTIFIC_NOTATION, true);
 
-                break;
-            }
-            case R.id.set_notation: {
-                final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
-                        MODE_PRIVATE);
-                final boolean useScientificNotation =
-                        preferences.getBoolean(USE_SCIENTIFIC_NOTATION, true);
+            int checkedItem = useScientificNotation ? 0 : 1;
 
-                int checkedItem = useScientificNotation ? 0 : 1;
+            Builder builder = new Builder(new ContextThemeWrapper(this,
+                    R.style.AppTheme));
+            builder.setTitle(R.string.choose_notation);
+            builder.setSingleChoiceItems(R.array.notations, checkedItem,
+                    (dialog, which) -> {
+                        SharedPreferences.Editor editor = preferences.edit();
+                        editor.putBoolean(USE_SCIENTIFIC_NOTATION, which == 0);
+                        editor.apply();
 
-                Builder builder = new Builder(new ContextThemeWrapper(this,
-                        R.style.AppTheme));
-                builder.setTitle(R.string.choose_notation);
-                builder.setSingleChoiceItems(R.array.notations, checkedItem,
-                        (dialog, which) -> {
-                            SharedPreferences.Editor editor = preferences.edit();
-                            editor.putBoolean(USE_SCIENTIFIC_NOTATION, which == 0);
-                            editor.apply();
+                        dialog.dismiss();
 
-                            dialog.dismiss();
+                        TunerView tunerView = findViewById(R.id.pitch);
+                        tunerView.invalidate();
+                    });
+            builder.show();
+        } else if (itemId == R.id.toggle_dark_mode) {
+            final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
+                    MODE_PRIVATE);
+            boolean currentlyUsingDarkMode = preferences.getBoolean(USE_DARK_MODE, true);
 
-                            TunerView tunerView = findViewById(R.id.pitch);
-                            tunerView.invalidate();
-                        });
-                builder.show();
+            SharedPreferences.Editor editor = preferences.edit();
+            editor.putBoolean(USE_DARK_MODE, !currentlyUsingDarkMode);
+            editor.apply();
 
-                break;
-            }
-            case R.id.toggle_dark_mode: {
-                final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
-                        MODE_PRIVATE);
-                boolean currentlyUsingDarkMode = preferences.getBoolean(USE_DARK_MODE, true);
+            recreate();
+        } else if (itemId == R.id.set_reference_pitch) {
+            final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
+                    MODE_PRIVATE);
+            int referencePitch = preferences.getInt(REFERENCE_PITCH, 440);
 
-                SharedPreferences.Editor editor = preferences.edit();
-                editor.putBoolean(USE_DARK_MODE, !currentlyUsingDarkMode);
-                editor.apply();
+            NumberPickerDialog dialog = new NumberPickerDialog();
 
-                recreate();
+            Bundle bundle = new Bundle();
+            bundle.putInt("current_value", referencePitch);
+            dialog.setArguments(bundle);
 
-                break;
-            }
-            case R.id.set_reference_pitch: {
-                final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
-                        MODE_PRIVATE);
-                int referencePitch = preferences.getInt(REFERENCE_PITCH, 440);
+            dialog.setValueChangeListener(this);
+            dialog.show(getSupportFragmentManager(), "reference_pitch_picker");
+        } else if (itemId == R.id.choose_tuning_mode) {
+            final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
+                    MODE_PRIVATE);
+            NotePickerDialog dialog = new NotePickerDialog();
 
-                NumberPickerDialog dialog = new NumberPickerDialog();
+            Bundle bundle = new Bundle();
+            bundle.putBoolean("use_scientific_notation", preferences.getBoolean(
+                    MainActivity.USE_SCIENTIFIC_NOTATION, true));
+            bundle.putInt("current_value", referencePosition);
+            dialog.setArguments(bundle);
 
-                Bundle bundle = new Bundle();
-                bundle.putInt("current_value", referencePitch);
-                dialog.setArguments(bundle);
-
-                dialog.setValueChangeListener(this);
-                dialog.show(getSupportFragmentManager(), "reference_pitch_picker");
-
-                break;
-            }
-            case R.id.choose_tuning_mode: {
-                final SharedPreferences preferences = getSharedPreferences(PREFS_FILE,
-                        MODE_PRIVATE);
-                NotePickerDialog dialog = new NotePickerDialog();
-
-                Bundle bundle = new Bundle();
-                bundle.putBoolean("use_scientific_notation", preferences.getBoolean(
-                        MainActivity.USE_SCIENTIFIC_NOTATION, true));
-                bundle.putInt("current_value", referencePosition);
-                dialog.setArguments(bundle);
-
-                dialog.setValueChangeListener(this);
-                dialog.show(getSupportFragmentManager(), "note_picker");
-            }
+            dialog.setValueChangeListener(this);
+            dialog.show(getSupportFragmentManager(), "note_picker");
         }
 
         return false;
